@@ -1,6 +1,5 @@
 import { Platform } from "react-native";
 import {
-    BleManager,
     Characteristic,
     Device,
     Subscription,
@@ -8,6 +7,7 @@ import {
 
 import { OBDTransport } from "../obd/transport";
 import { base64ToUtf8, utf8ToBase64 } from "./base64";
+import { getBleManager, stopAnyBleScan } from "./ble-client";
 import { ReadBuffer } from "./readBuffer";
 
 /**
@@ -77,9 +77,11 @@ interface ServiceInventory {
 export class BleTransport implements OBDTransport {
   readonly name: string;
 
-  private manager: BleManager;
+  private manager = getBleManager();
   private device: Device | null = null;
   private subscription: Subscription | null = null;
+  private disconnectSubscription: Subscription | null = null;
+  private disconnectCallback: (() => void) | null = null;
   private readBuffer = new ReadBuffer();
   private connected = false;
 
@@ -94,7 +96,6 @@ export class BleTransport implements OBDTransport {
     name: string,
     options: BleTransportOptions = {},
   ) {
-    this.manager = new BleManager();
     this.name = name;
     this.serviceUuid = options.serviceUuid ?? null;
     this.notifyUuid = options.notifyUuid ?? null;
@@ -103,15 +104,41 @@ export class BleTransport implements OBDTransport {
     this.readTimeoutMs = options.readTimeoutMs ?? 6000;
   }
 
+  onDisconnected(listener: () => void): void {
+    this.disconnectCallback = listener;
+  }
+
   async connect(): Promise<void> {
-    // Buffer nuevo en cada conexión: evita arrastrar restos de la anterior.
+    // 1. Detener cualquier escaneo en curso para liberar el chip de radio BLE
+    await stopAnyBleScan();
+
+    // 2. Buffer nuevo en cada conexión: evita arrastrar restos de la anterior.
     this.readBuffer = new ReadBuffer();
+
+    // 3. Si el dispositivo ya figura como conectado a nivel de SO, forzar desconexión previa
+    try {
+      const isAlreadyConnected = await this.manager.isDeviceConnected(this.deviceId);
+      if (isAlreadyConnected) {
+        await this.manager.cancelDeviceConnection(this.deviceId);
+        await delay(400);
+      }
+    } catch {
+      // ignorar errores al consultar estado previo
+    }
 
     const device = await this.manager.connectToDevice(this.deviceId, {
       autoConnect: false,
       timeout: 15000,
     });
     this.device = device;
+
+    // Escuchar desconexión física/radio del dispositivo
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = device.onDisconnected((error, disconnectedDevice) => {
+      this.connected = false;
+      this.readBuffer.rejectAll(new Error("Adaptador BLE desconectado"));
+      this.disconnectCallback?.();
+    });
 
     await device.discoverAllServicesAndCharacteristics();
     await this.requestMtu(device);
@@ -123,6 +150,8 @@ export class BleTransport implements OBDTransport {
 
   async disconnect(): Promise<void> {
     this.connected = false;
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = null;
     this.subscription?.remove();
     this.subscription = null;
     this.readBuffer.rejectAll(new Error("connection closed"));
@@ -135,6 +164,8 @@ export class BleTransport implements OBDTransport {
       }
       this.device = null;
     }
+    // Pequeño margen para que el hardware y el stack GATT liberen los recursos
+    await delay(250);
   }
 
   isConnected(): boolean {

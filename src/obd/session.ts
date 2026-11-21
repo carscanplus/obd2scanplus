@@ -68,6 +68,7 @@ export class ObdSession {
 
   unitPreferences: UnitPreferences = { ...DEFAULT_UNIT_PREFERENCES };
   readTimeoutMs = DEFAULT_READ_TIMEOUT_MS;
+  onDisconnected?: () => void;
 
   get connected(): boolean {
     return this._connected;
@@ -105,6 +106,14 @@ export class ObdSession {
     this.transport = transport;
     this.supportedPids = null;
     this.protocolName = null;
+    this.queue = Promise.resolve();
+
+    transport.onDisconnected?.(() => {
+      this._connected = false;
+      this.queue = Promise.resolve();
+      this.onDisconnected?.();
+    });
+
     try {
       await transport.connect();
       await this.probeAdapter();
@@ -123,6 +132,7 @@ export class ObdSession {
       this.transport = null;
       this.elmVersion = null;
       this._connected = false;
+      this.queue = Promise.resolve();
       throw error;
     }
   }
@@ -135,6 +145,7 @@ export class ObdSession {
   }
 
   disconnect(): void {
+    this.queue = Promise.resolve();
     if (this.transport) {
       void this.transport.disconnect();
       this.transport = null;

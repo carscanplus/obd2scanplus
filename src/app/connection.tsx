@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+    ActivityIndicator,
     Platform,
     Pressable,
     ScrollView,
@@ -47,6 +48,9 @@ export default function ConnectionScreen() {
   const [scanning, setScanning] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  const bleScanRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,25 +61,38 @@ export default function ConnectionScreen() {
           if (!cancelled) setSppDevices(devices);
         })
         .catch((error: unknown) => {
-          if (cancelled) return;
-          setSppDevices([]);
-          setScanError(
-            error instanceof Error ? error.message : String(error),
-          );
+          if (!cancelled) {
+            setSppDevices([]);
+            setScanError(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
         });
     }
 
     return () => {
       cancelled = true;
+      bleScanRef.current?.stop();
       cancelClassicDiscovery();
     };
   }, []);
 
+  const stopAllScanning = () => {
+    if (bleScanRef.current) {
+      bleScanRef.current.stop();
+      bleScanRef.current = null;
+    }
+    setScanning(false);
+    cancelClassicDiscovery();
+    setDiscovering(false);
+  };
+
   const startBleScan = () => {
+    stopAllScanning();
     setBleDevices([]);
     setScanError(null);
     setScanning(true);
-    scanBleDevices(
+    bleScanRef.current = scanBleDevices(
       (device) => {
         setBleDevices((prev) => mergeDevice(prev, device));
       },
@@ -84,11 +101,15 @@ export default function ConnectionScreen() {
         setScanError(message);
       },
     );
-    setTimeout(() => setScanning(false), 5500);
+    setTimeout(() => {
+      setScanning(false);
+      bleScanRef.current = null;
+    }, 5500);
   };
 
   const startClassicScan = async () => {
     if (discovering) return;
+    stopAllScanning();
     setDiscovering(true);
     setScanError(null);
     try {
@@ -102,7 +123,28 @@ export default function ConnectionScreen() {
     }
   };
 
-  const connected = status === "connected" || status === "connecting";
+  const handleConnectBle = async (id: string, name: string) => {
+    stopAllScanning();
+    setConnectingId(id);
+    try {
+      await connectBle(id, name);
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
+  const handleConnectSpp = async (id: string, name: string) => {
+    stopAllScanning();
+    setConnectingId(id);
+    try {
+      await connectSpp(id, name);
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
+  const isConnecting = status === "connecting";
+  const connected = status === "connected" || isConnecting;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -139,23 +181,32 @@ export default function ConnectionScreen() {
                 : 'No hay dispositivos. Pulsa "Buscar", activa la ubicación del sistema y, si no aparece, vincula el ELM327 en Ajustes de Bluetooth.'}
             </Text>
           ) : (
-            sortDevices(sppDevices).map((item) => (
-              <Pressable
-                key={item.id}
-                style={styles.device}
-                onPress={() => void connectSpp(item.id, item.name)}
-              >
-                <View style={styles.deviceHeader}>
-                  <Text style={styles.deviceName}>{item.name}</Text>
-                  {isObdLikeDevice(item.name) && (
-                    <View style={styles.obdBadge}>
-                      <Text style={styles.obdBadgeText}>OBD</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.deviceId}>{item.id}</Text>
-              </Pressable>
-            ))
+            sortDevices(sppDevices).map((item) => {
+              const thisConnecting = isConnecting && connectingId === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  style={[styles.device, thisConnecting && styles.deviceConnecting]}
+                  onPress={() => void handleConnectSpp(item.id, item.name)}
+                  disabled={isConnecting}
+                >
+                  <View style={styles.deviceHeader}>
+                    <Text style={styles.deviceName}>{item.name}</Text>
+                    {thisConnecting && (
+                      <ActivityIndicator size="small" color={Colors.accent} />
+                    )}
+                    {isObdLikeDevice(item.name) && (
+                      <View style={styles.obdBadge}>
+                        <Text style={styles.obdBadgeText}>OBD</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.deviceId}>
+                    {thisConnecting ? "Conectando e inicializando..." : item.id}
+                  </Text>
+                </Pressable>
+              );
+            })
           )}
         </View>
       )}
@@ -166,7 +217,7 @@ export default function ConnectionScreen() {
           <Pressable
             style={styles.scanButton}
             onPress={startBleScan}
-            disabled={scanning}
+            disabled={scanning || isConnecting}
           >
             <Text style={styles.scanText}>
               {scanning ? "ESCANEANDO..." : "ESCANEAR"}
@@ -180,23 +231,32 @@ export default function ConnectionScreen() {
               : 'Pulsa "Escanear" y elige tu adaptador BLE (por ejemplo "V011", servicio FFE0).'}
           </Text>
         ) : (
-          sortDevices(bleDevices).map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.device}
-              onPress={() => void connectBle(item.id, item.name)}
-            >
-              <View style={styles.deviceHeader}>
-                <Text style={styles.deviceName}>{item.name}</Text>
-                {isObdLikeDevice(item.name) && (
-                  <View style={styles.obdBadge}>
-                    <Text style={styles.obdBadgeText}>OBD</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.deviceId}>{item.id}</Text>
-            </Pressable>
-          ))
+          sortDevices(bleDevices).map((item) => {
+            const thisConnecting = isConnecting && connectingId === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                style={[styles.device, thisConnecting && styles.deviceConnecting]}
+                onPress={() => void handleConnectBle(item.id, item.name)}
+                disabled={isConnecting}
+              >
+                <View style={styles.deviceHeader}>
+                  <Text style={styles.deviceName}>{item.name}</Text>
+                  {thisConnecting && (
+                    <ActivityIndicator size="small" color={Colors.accent} />
+                  )}
+                  {isObdLikeDevice(item.name) && (
+                    <View style={styles.obdBadge}>
+                      <Text style={styles.obdBadgeText}>OBD</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.deviceId}>
+                  {thisConnecting ? "Conectando e inicializando..." : item.id}
+                </Text>
+              </Pressable>
+            );
+          })
         )}
       </View>
     </ScrollView>
@@ -281,6 +341,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 14,
     marginBottom: 8,
+  },
+  deviceConnecting: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.surfaceAlt,
   },
   deviceHeader: {
     flexDirection: "row",

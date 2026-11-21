@@ -1,6 +1,8 @@
 import { PermissionsAndroid, Platform } from "react-native";
-import { BleManager, Device } from "react-native-ble-plx";
+import { Device } from "react-native-ble-plx";
 import RNBluetoothClassic from "react-native-bluetooth-classic";
+
+import { getBleManager, stopAnyBleScan } from "./ble-client";
 
 export interface DiscoveredDevice {
   id: string;
@@ -155,7 +157,7 @@ export function scanBleDevices(
   scanSeconds = 5,
   onError?: (message: string) => void,
 ): { stop: () => void } {
-  const manager = new BleManager();
+  const manager = getBleManager();
   const seen = new Set<string>();
   let finished = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -163,7 +165,11 @@ export function scanBleDevices(
   const stopScan = () => {
     finished = true;
     if (timer) clearTimeout(timer);
-    void manager.stopDeviceScan();
+    try {
+      void manager.stopDeviceScan();
+    } catch {
+      // ignorar
+    }
   };
 
   const fail = (message: string) => {
@@ -171,7 +177,7 @@ export function scanBleDevices(
     onError?.(message);
   };
 
-  void requestBlePermissions().then((granted) => {
+  void requestBlePermissions().then(async (granted) => {
     if (finished) return;
     if (!granted) {
       fail("Se necesitan permisos de Bluetooth para escanear dispositivos BLE.");
@@ -179,6 +185,7 @@ export function scanBleDevices(
     }
 
     try {
+      await stopAnyBleScan();
       manager.startDeviceScan(
         null,
         { allowDuplicates: false },

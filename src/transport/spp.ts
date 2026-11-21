@@ -13,8 +13,6 @@ interface PendingRead {
  * Transporte Bluetooth Clásico (SPP) para Android usando
  * `react-native-bluetooth-classic`. Solo funciona en Android (en iOS el SPP
  * requiere hardware MFi y no está soportado aquí).
- *
- * Requiere validación con un dispositivo real.
  */
 export class SppTransport implements OBDTransport {
   readonly name: string;
@@ -23,6 +21,8 @@ export class SppTransport implements OBDTransport {
   private connected = false;
   private buffer = "";
   private subscription: { remove(): void } | null = null;
+  private disconnectSubscription: { remove(): void } | null = null;
+  private disconnectCallback: (() => void) | null = null;
   private pending: PendingRead[] = [];
 
   constructor(address: string, name: string) {
@@ -30,14 +30,26 @@ export class SppTransport implements OBDTransport {
     this.name = name;
   }
 
+  onDisconnected(listener: () => void): void {
+    this.disconnectCallback = listener;
+  }
+
   async connect(): Promise<void> {
+    // Si ya figuraba conectado, desconectar primero para resetear el socket RFCOMM
+    try {
+      const alreadyConnected = await RNBluetoothClassic.isDeviceConnected(this.address);
+      if (alreadyConnected) {
+        await RNBluetoothClassic.disconnectFromDevice(this.address);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    } catch {
+      // ignorar
+    }
+
     // Los ELM327 responden cuando tienen datos disponibles y terminan cada
     // respuesta con `>`, no con el delimitador `\n` que usa la librería por
     // defecto. Un delimitador vacío entrega cada bloque recibido para que
     // readUntil(">") pueda ensamblarlo correctamente.
-    //
-    // Muchos adaptadores ELM327 económicos también exponen RFCOMM sin el
-    // requisito de un socket seguro.
     await RNBluetoothClassic.connectToDevice(this.address, {
       delimiter: "",
       charset: "ascii",
@@ -45,6 +57,15 @@ export class SppTransport implements OBDTransport {
     });
     this.connected = true;
     this.buffer = "";
+
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected((event) => {
+      if (event.device?.address === this.address) {
+        this.connected = false;
+        this.rejectAll(new Error("Adaptador Bluetooth clásico desconectado"));
+        this.disconnectCallback?.();
+      }
+    });
 
     this.subscription = RNBluetoothClassic.onDeviceRead(
       this.address,
@@ -56,6 +77,9 @@ export class SppTransport implements OBDTransport {
   }
 
   async disconnect(): Promise<void> {
+    this.connected = false;
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = null;
     this.subscription?.remove();
     this.subscription = null;
     this.rejectAll(new Error("connection closed"));
@@ -64,7 +88,7 @@ export class SppTransport implements OBDTransport {
     } catch {
       // ignorar errores al desconectar
     }
-    this.connected = false;
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   isConnected(): boolean {

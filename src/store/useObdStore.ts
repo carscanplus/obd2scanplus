@@ -103,6 +103,7 @@ export const useObdStore = create<ObdState>((set, get) => {
     busy = false;
 
     let index = 0;
+    let consecutiveErrors = 0;
     pollTimer = setInterval(async () => {
       const state = get();
       if (!state.session.connected || state.paused || busy) return;
@@ -114,6 +115,7 @@ export const useObdStore = create<ObdState>((set, get) => {
         index += 1;
 
         const response = await state.session.query(Command.newPid(pid.command));
+        consecutiveErrors = 0;
         const scalar = computeScalar(
           pid,
           response,
@@ -132,7 +134,16 @@ export const useObdStore = create<ObdState>((set, get) => {
           },
         }));
       } catch {
-        // ignorar errores puntuales de lectura
+        consecutiveErrors += 1;
+        // Si hay varios fallos seguidos y el adaptador ya no responde
+        if (consecutiveErrors >= 4) {
+          stopPolling();
+          state.session.disconnect();
+          set({
+            status: "error",
+            connectionMessage: "Se perdió la conexión con el adaptador OBD2.",
+          });
+        }
       } finally {
         busy = false;
       }
@@ -150,31 +161,57 @@ export const useObdStore = create<ObdState>((set, get) => {
     scanning: false,
 
     connectSpp: async (address, name) => {
+      // 1. Limpieza rigurosa de cualquier sesión previa
+      get().disconnect();
+      await new Promise((r) => setTimeout(r, 250));
+
       const session = new ObdSession();
+      session.onDisconnected = () => {
+        stopPolling();
+        set({
+          status: "disconnected",
+          connectionMessage: `El adaptador ${name} se ha desconectado.`,
+        });
+      };
+
       set({
         session,
         status: "connecting",
-        connectionMessage: "Conectando...",
+        connectionMessage: `Conectando a ${name}...`,
       });
       try {
         await session.connect(new SppTransport(address, name), 0);
         startSession(session, name);
       } catch (error) {
+        session.disconnect();
         set({ status: "error", connectionMessage: errorMessage(error) });
       }
     },
 
     connectBle: async (id, name) => {
+      // 1. Limpieza rigurosa de cualquier sesión previa
+      get().disconnect();
+      await new Promise((r) => setTimeout(r, 250));
+
       const session = new ObdSession();
+      session.onDisconnected = () => {
+        stopPolling();
+        set({
+          status: "disconnected",
+          connectionMessage: `El adaptador ${name} se ha desconectado.`,
+        });
+      };
+
       set({
         session,
         status: "connecting",
-        connectionMessage: "Conectando (BLE)...",
+        connectionMessage: `Conectando (BLE) a ${name}...`,
       });
       try {
         await session.connect(new BleTransport(id, name), 0);
         startSession(session, name);
       } catch (error) {
+        session.disconnect();
         set({ status: "error", connectionMessage: errorMessage(error) });
       }
     },

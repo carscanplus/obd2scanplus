@@ -1,9 +1,9 @@
 /**
  * Abstracción de transporte para hablar con un adaptador ELM327.
- * Las implementaciones reales (SPP Bluetooth y BLE) vivirán en `src/transport/`.
+ * Las implementaciones reales (SPP Bluetooth y BLE) viven en `src/transport/`.
  */
 export interface OBDTransport {
-  /** Nombre legible del dispositivo/puerto (p. ej. "OBDII" o "COM4"). */
+  /** Nombre legible del dispositivo/puerto (p. ej. "OBDII" o "V011"). */
   readonly name: string;
 
   connect(): Promise<void>;
@@ -21,4 +21,10 @@ export interface OBDTransport {
 
   /** Limpia los buffers de entrada/salida. */
   clear(): Promise<void>;
+
+  /**
+   * Registra un callback que se dispara si el hardware o radio se desconecta
+   * inesperadamente (pérdida de señal, vehículo apagado, etc.).
+   */
+  onDisconnected?: (listener: () => void) => void;
 }
