@@ -180,7 +180,7 @@ export const useObdStore = create<ObdState>((set, get) => {
       set({
         status: "connected",
         isDemoMode: true,
-        connectionName: "Simulador Cockpit",
+        connectionName: "Simulador Auto",
         connectionMessage: "⚡ MODO DEMO: Simulación en tiempo real activa",
         live: {},
         dtcs: [],

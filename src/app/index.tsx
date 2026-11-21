@@ -26,7 +26,7 @@ export default function DashboardScreen() {
   const values = Object.values(live);
   const connected = status === "connected";
 
-  // Extraer RPM y Velocidad para el medidor principal del Cockpit
+  // Extraer RPM y Velocidad para el medidor principal del Auto
   const rpmValue = live["Engine Speed"]?.value ?? 0;
   const speedValue = live["Vehicle Speed"]?.value ?? 0;
 
@@ -101,7 +101,7 @@ export default function DashboardScreen() {
             <View style={styles.emptyIconBox}>
               <Text style={styles.emptyCarIcon}>🏎️</Text>
             </View>
-            <Text style={styles.emptyTitle}>COCKPIT EN ESPERA</Text>
+            <Text style={styles.emptyTitle}>AUTO EN ESPERA</Text>
             <Text style={styles.emptyText}>
               Conecta tu adaptador OBD2 Bluetooth (V011 BLE) o prueba todos los medidores en tiempo
               real con el simulador interactivo.
@@ -125,7 +125,7 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <>
-            {/* Medidor Principal Cockpit: Tacómetro & Velocímetro */}
+            {/* Medidor Principal Auto: Tacómetro & Velocímetro */}
             <RpmGauge rpm={rpmValue} speed={speedValue} />
 
             {/* Título de Sensores Secundarios */}

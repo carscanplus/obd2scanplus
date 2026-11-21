@@ -16,7 +16,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: Colors.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "OBD2 Cockpit" }} />
+        <Stack.Screen name="index" options={{ title: "OBD2 Auto" }} />
         <Stack.Screen name="connection" options={{ title: "Conexión Bluetooth" }} />
         <Stack.Screen name="dtcs" options={{ title: "Diagnóstico DTC" }} />
       </Stack>
