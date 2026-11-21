@@ -1,7 +1,9 @@
 import { Link } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { UpdateModal } from "@/components/update-modal";
 import { Colors } from "@/constants/colors";
+import { useAppUpdate } from "@/hooks/use-app-update";
 import { LiveValue, useObdStore } from "@/store/useObdStore";
 
 function MetricCard({ value }: { value: LiveValue }) {
@@ -23,6 +25,8 @@ export default function DashboardScreen() {
   const paused = useObdStore((s) => s.paused);
   const setPaused = useObdStore((s) => s.setPaused);
   const clearDashboard = useObdStore((s) => s.clearDashboard);
+
+  const { checking, updateInfo, isModalOpen, check, closeModal } = useAppUpdate();
 
   const values = Object.values(live);
   const connected = status === "connected";
@@ -70,6 +74,27 @@ export default function DashboardScreen() {
             <Text style={styles.navText}>CÓDIGOS</Text>
           </Pressable>
         </Link>
+        <Pressable
+          style={[
+            styles.navButton,
+            updateInfo?.hasUpdate && styles.updateNavButton,
+          ]}
+          onPress={() => check(true)}
+          disabled={checking}
+        >
+          <Text
+            style={[
+              styles.navText,
+              updateInfo?.hasUpdate && styles.updateNavText,
+            ]}
+          >
+            {checking
+              ? "BUSCANDO..."
+              : updateInfo?.hasUpdate
+                ? "★ ACTUALIZAR"
+                : "ACTUALIZAR"}
+          </Text>
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.grid}>
@@ -90,6 +115,12 @@ export default function DashboardScreen() {
           values.map((value) => <MetricCard key={value.name} value={value} />)
         )}
       </ScrollView>
+
+      <UpdateModal
+        visible={isModalOpen}
+        onClose={closeModal}
+        updateInfo={updateInfo}
+      />
     </View>
   );
 }
@@ -147,6 +178,13 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 13,
     fontWeight: "700",
+  },
+  updateNavButton: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  updateNavText: {
+    color: Colors.background,
   },
   grid: {
     padding: 16,

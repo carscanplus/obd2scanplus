@@ -121,3 +121,27 @@ Detalles que implementa el código:
 - **El adaptador cierra la conexión**: suele ser alimentación o el contacto
   apagado; vuelve a conectar.
 
+## Actualizaciones y Nuevas Versiones (GitHub Releases)
+
+La aplicación cuenta con un sistema integrado de actualización directa desde GitHub:
+
+1. **Compilación automática**: Al crear y subir un tag de versión a GitHub (ej: `v1.0.1`), un workflow de GitHub Actions compila automáticamente el APK standalone y lo adjunta a una nueva **Release**.
+2. **Detección en la app**: Al abrir la aplicación en el dispositivo (o pulsar el botón **ACTUALIZAR** en el Dashboard), la app consulta la API de GitHub Releases.
+3. **Instalación con 1 clic**: Si detecta una versión más nueva, muestra un modal con las notas del lanzamiento y el botón **DESCARGAR E INSTALAR**, el cual descarga e instala el nuevo APK encima de la versión actual sin perder configuraciones.
+
+### Cómo publicar una nueva versión:
+
+```bash
+# 1. Actualiza la versión en package.json y app.json (ej: 1.0.1)
+# 2. Guarda los cambios y haz commit
+git add .
+git commit -m "feat: descripción de mejoras"
+git push origin main
+
+# 3. Crea la etiqueta de versión y súbela a GitHub
+git tag v1.0.1
+git push origin v1.0.1
+```
+*(También puedes disparar la compilación manualmente desde la pestaña **Actions** en GitHub usando el botón **Run workflow**).*
+
+
