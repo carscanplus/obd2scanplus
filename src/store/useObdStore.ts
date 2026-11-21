@@ -33,9 +33,12 @@ interface ObdState {
   dtcs: TroubleCode[];
   paused: boolean;
   scanning: boolean;
+  isDemoMode: boolean;
 
   connectSpp: (address: string, name: string) => Promise<void>;
   connectBle: (id: string, name: string) => Promise<void>;
+  startDemoMode: () => void;
+  stopDemoMode: () => void;
   disconnect: () => void;
   scanDtcs: () => Promise<void>;
   clearDtcs: () => Promise<void>;
@@ -70,7 +73,16 @@ function dashboardPids(session: ObdSession): PidDefinition[] {
 
 export const useObdStore = create<ObdState>((set, get) => {
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let demoTimer: ReturnType<typeof setInterval> | null = null;
+  let demoStep = 0;
   let busy = false;
+
+  function stopDemo(): void {
+    if (demoTimer) {
+      clearInterval(demoTimer);
+      demoTimer = null;
+    }
+  }
 
   function connectedMessage(session: ObdSession, name: string): string {
     const info = [session.elmVersionName, session.protocol]
@@ -80,8 +92,10 @@ export const useObdStore = create<ObdState>((set, get) => {
   }
 
   function startSession(session: ObdSession, name: string): void {
+    stopDemo();
     set({
       status: "connected",
+      isDemoMode: false,
       connectionName: name,
       connectionMessage: connectedMessage(session, name),
       live: {},
@@ -159,6 +173,65 @@ export const useObdStore = create<ObdState>((set, get) => {
     dtcs: [],
     paused: false,
     scanning: false,
+    isDemoMode: false,
+
+    startDemoMode: () => {
+      get().disconnect();
+      set({
+        status: "connected",
+        isDemoMode: true,
+        connectionName: "Simulador Cockpit",
+        connectionMessage: "⚡ MODO DEMO: Simulación en tiempo real activa",
+        live: {},
+        dtcs: [],
+      });
+
+      demoStep = 0;
+      demoTimer = setInterval(() => {
+        const state = get();
+        if (state.paused) return;
+
+        demoStep += 1;
+        const t = demoStep * 0.15;
+
+        // Simulación de aceleraciones y cambios de marcha suaves
+        const cycle = Math.sin(t);
+        const rpmBase = 900 + Math.abs(cycle) * 3200 + (demoStep % 7) * 40;
+        const rpm = Math.round(rpmBase);
+        const speed = Math.max(0, Math.round(Math.abs(cycle) * 88));
+        const load = Math.round(18 + Math.abs(cycle) * 45);
+        const throttle = Math.round(12 + Math.abs(cycle) * 40);
+        const coolant = Math.round(88 + Math.sin(t * 0.2) * 3);
+        const voltage = Math.round((14.0 + Math.sin(t * 0.4) * 0.3) * 10) / 10;
+        const maf = Math.round((rpm / 200) * 1.6 * 10) / 10;
+        const fuel = 68;
+
+        set({
+          live: {
+            "Engine Speed": { name: "Engine Speed", value: rpm, unit: "RPM" },
+            "Vehicle Speed": { name: "Vehicle Speed", value: speed, unit: "km/h" },
+            "Coolant Temp.": { name: "Coolant Temp.", value: coolant, unit: "°C" },
+            "Engine Load": { name: "Engine Load", value: load, unit: "%" },
+            "Throttle Pos.": { name: "Throttle Pos.", value: throttle, unit: "%" },
+            "Control Module Voltage": { name: "Control Module Voltage", value: voltage, unit: "V" },
+            "MAF Airflow Rate": { name: "MAF Airflow Rate", value: maf, unit: "g/s" },
+            "Fuel Level Input": { name: "Fuel Level Input", value: fuel, unit: "%" },
+          },
+        });
+      }, 350);
+    },
+
+    stopDemoMode: () => {
+      stopDemo();
+      set({
+        status: "disconnected",
+        isDemoMode: false,
+        connectionName: "Ninguno",
+        connectionMessage: "Sin conexión",
+        live: {},
+        dtcs: [],
+      });
+    },
 
     connectSpp: async (address, name) => {
       // 1. Limpieza rigurosa de cualquier sesión previa
@@ -218,9 +291,11 @@ export const useObdStore = create<ObdState>((set, get) => {
 
     disconnect: () => {
       stopPolling();
+      stopDemo();
       get().session.disconnect();
       set({
         status: "disconnected",
+        isDemoMode: false,
         connectionMessage: "Sin conexión",
         connectionName: "Ninguno",
         live: {},
@@ -231,6 +306,28 @@ export const useObdStore = create<ObdState>((set, get) => {
 
     scanDtcs: async () => {
       set({ scanning: true });
+      if (get().isDemoMode) {
+        await new Promise((r) => setTimeout(r, 1000));
+        set({
+          dtcs: [
+            {
+              code: "P0420",
+              category: "Powertrain",
+              description: "Eficiencia del sistema catalizador por debajo del umbral (Banco 1)",
+              permanent: false,
+            },
+            {
+              code: "P0171",
+              category: "Powertrain",
+              description: "Sistema de inyección demasiado pobre (Banco 1)",
+              permanent: true,
+            },
+          ],
+          scanning: false,
+        });
+        return;
+      }
+
       try {
         const state = get();
         const [codes, permanent] = await Promise.all([
@@ -244,6 +341,11 @@ export const useObdStore = create<ObdState>((set, get) => {
     },
 
     clearDtcs: async () => {
+      if (get().isDemoMode) {
+        set({ dtcs: [], connectionMessage: "Códigos borrados exitosamente (Modo Demo)" });
+        return;
+      }
+
       try {
         const cleared = await get().session.clearTroubleCodes();
         if (!cleared) {

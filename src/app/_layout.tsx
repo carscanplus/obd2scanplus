@@ -9,15 +9,16 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: Colors.background },
+          headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
-          headerTitleStyle: { fontWeight: "700" },
+          headerTitleStyle: { fontWeight: "800", fontSize: 17 },
+          headerShadowVisible: false,
           contentStyle: { backgroundColor: Colors.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "Dashboard" }} />
-        <Stack.Screen name="connection" options={{ title: "Conexión" }} />
-        <Stack.Screen name="dtcs" options={{ title: "Códigos de falla" }} />
+        <Stack.Screen name="index" options={{ title: "OBD2 Cockpit" }} />
+        <Stack.Screen name="connection" options={{ title: "Conexión Bluetooth" }} />
+        <Stack.Screen name="dtcs" options={{ title: "Diagnóstico DTC" }} />
       </Stack>
     </>
   );

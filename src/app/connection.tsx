@@ -9,6 +9,7 @@ import {
     View,
 } from "react-native";
 
+import { NavBar } from "@/components/nav-bar";
 import { Colors } from "@/constants/colors";
 import { useObdStore } from "@/store/useObdStore";
 import {
@@ -147,15 +148,17 @@ export default function ConnectionScreen() {
   const connected = status === "connected" || isConnecting;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.statusBox}>
-        <Text style={styles.statusText}>{connectionMessage}</Text>
-        {connected && (
-          <Pressable style={styles.disconnectButton} onPress={disconnect}>
-            <Text style={styles.disconnectText}>DESCONECTAR</Text>
-          </Pressable>
-        )}
-      </View>
+    <View style={styles.container}>
+      <NavBar />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.statusBox}>
+          <Text style={styles.statusText}>{connectionMessage}</Text>
+          {connected && (
+            <Pressable style={styles.disconnectButton} onPress={disconnect}>
+              <Text style={styles.disconnectText}>DESCONECTAR</Text>
+            </Pressable>
+          )}
+        </View>
 
       {Platform.OS === "android" && (
         <View style={styles.section}>
@@ -260,6 +263,7 @@ export default function ConnectionScreen() {
         )}
       </View>
     </ScrollView>
+  </View>
   );
 }
 
