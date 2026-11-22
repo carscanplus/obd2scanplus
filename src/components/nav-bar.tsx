@@ -3,13 +3,7 @@ import { StyleSheet, Text, View, Pressable } from "react-native";
 import { Link, usePathname } from "expo-router";
 import { Colors } from "@/constants/colors";
 
-interface NavBarProps {
-  onCheckUpdate?: () => void;
-  hasUpdate?: boolean;
-  checkingUpdate?: boolean;
-}
-
-export function NavBar({ onCheckUpdate, hasUpdate, checkingUpdate }: NavBarProps) {
+export function NavBar() {
   const pathname = usePathname();
 
   const isHome = pathname === "/" || pathname === "/index";
@@ -20,37 +14,24 @@ export function NavBar({ onCheckUpdate, hasUpdate, checkingUpdate }: NavBarProps
     <View style={styles.nav}>
       <Link href="/" asChild>
         <Pressable style={[styles.tab, isHome && styles.tabActive]}>
-          <Text style={styles.tabIcon}>📊</Text>
-          <Text style={[styles.tabText, isHome && styles.tabTextActive]}>DASHBOARD</Text>
+          <Text style={[styles.tabIcon, !isHome && styles.tabIconInactive]}>📊</Text>
+          <Text style={[styles.tabText, isHome && styles.tabTextActive]}>Dashboard</Text>
         </Pressable>
       </Link>
 
       <Link href="/dtcs" asChild>
         <Pressable style={[styles.tab, isDtcs && styles.tabActive]}>
-          <Text style={styles.tabIcon}>🔍</Text>
-          <Text style={[styles.tabText, isDtcs && styles.tabTextActive]}>CÓDIGOS</Text>
+          <Text style={[styles.tabIcon, !isDtcs && styles.tabIconInactive]}>🔍</Text>
+          <Text style={[styles.tabText, isDtcs && styles.tabTextActive]}>Códigos</Text>
         </Pressable>
       </Link>
 
       <Link href="/connection" asChild>
         <Pressable style={[styles.tab, isConnection && styles.tabActive]}>
-          <Text style={styles.tabIcon}>📡</Text>
-          <Text style={[styles.tabText, isConnection && styles.tabTextActive]}>CONEXIÓN</Text>
+          <Text style={[styles.tabIcon, !isConnection && styles.tabIconInactive]}>📡</Text>
+          <Text style={[styles.tabText, isConnection && styles.tabTextActive]}>Conexión</Text>
         </Pressable>
       </Link>
-
-      {onCheckUpdate ? (
-        <Pressable
-          style={[styles.tab, hasUpdate && styles.tabUpdate]}
-          onPress={onCheckUpdate}
-          disabled={checkingUpdate}
-        >
-          <Text style={styles.tabIcon}>{hasUpdate ? "★" : "🔄"}</Text>
-          <Text style={[styles.tabText, hasUpdate && styles.tabTextUpdate]}>
-            {checkingUpdate ? "BUSCANDO..." : hasUpdate ? "NUEVA VER" : "ACTUALIZAR"}
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -58,47 +39,46 @@ export function NavBar({ onCheckUpdate, hasUpdate, checkingUpdate }: NavBarProps
 const styles = StyleSheet.create({
   nav: {
     flexDirection: "row",
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    backgroundColor: "#08090c",
+    borderWidth: 1,
+    borderColor: "#272e3b",
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
   },
   tab: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: Colors.surfaceAlt,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "transparent",
   },
   tabActive: {
-    backgroundColor: "rgba(0, 210, 255, 0.12)",
-    borderColor: Colors.accent,
-  },
-  tabUpdate: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    backgroundColor: "rgba(255, 87, 34, 0.16)",
+    borderColor: "rgba(255, 87, 34, 0.6)",
+    shadowColor: Colors.brandOrange,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
   },
   tabIcon: {
-    fontSize: 14,
-    marginBottom: 2,
+    fontSize: 13,
+  },
+  tabIconInactive: {
+    opacity: 0.55,
   },
   tabText: {
     color: Colors.muted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.5,
   },
   tabTextActive: {
-    color: Colors.accent,
-  },
-  tabTextUpdate: {
-    color: Colors.background,
+    color: Colors.text,
     fontWeight: "900",
   },
 });

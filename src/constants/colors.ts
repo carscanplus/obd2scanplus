@@ -21,4 +21,9 @@ export const Colors = {
   tempCold: "#00b0ff",
   tempNormal: "#00e676",
   tempHot: "#ff3d57",
+  brandOrange: "#ff5722",
+  brandAmber: "#ff9800",
+  brandRed: "#ff3d00",
+  brandCarbon: "#0d0e11",
+  brandDial: "#222834",
 };

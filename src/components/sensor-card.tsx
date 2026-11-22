@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Colors } from "@/constants/colors";
 import { LiveValue } from "@/store/useObdStore";
@@ -8,7 +8,6 @@ interface SensorConfig {
   icon: string;
   min: number;
   max: number;
-  unitOverride?: string;
   getAccentColor?: (val: number) => string;
 }
 
@@ -43,7 +42,7 @@ const SENSOR_META: Record<string, SensorConfig> = {
     getAccentColor: (val) => {
       if (val > 80) return Colors.danger;
       if (val > 50) return Colors.warning;
-      return Colors.accent;
+      return Colors.brandOrange;
     },
   },
   "Throttle Pos.": {
@@ -51,7 +50,7 @@ const SENSOR_META: Record<string, SensorConfig> = {
     icon: "⚡",
     min: 0,
     max: 100,
-    getAccentColor: () => Colors.accent,
+    getAccentColor: () => Colors.brandOrange,
   },
   "MAF Airflow Rate": {
     label: "FLUJO MAF",
@@ -82,12 +81,10 @@ export function SensorCard({ value }: { value: LiveValue }) {
   const icon = meta?.icon ?? "📊";
   const rounded = Math.round(value.value * 10) / 10;
 
-  // Cálculo de barra de porcentaje si se define rango
   let progressPercent = 0;
-  let barColor = Colors.accent;
+  let barColor = Colors.brandOrange;
   if (meta) {
-    const min = meta.min;
-    const max = meta.max;
+    const { min, max } = meta;
     progressPercent = Math.min(Math.max(((value.value - min) / (max - min)) * 100, 0), 100);
     if (meta.getAccentColor) {
       barColor = meta.getAccentColor(value.value);
@@ -96,6 +93,8 @@ export function SensorCard({ value }: { value: LiveValue }) {
 
   return (
     <View style={styles.card}>
+      <View style={[styles.accent, { backgroundColor: barColor }]} />
+
       <View style={styles.header}>
         <Text style={styles.icon}>{icon}</Text>
         <Text style={styles.name} numberOfLines={1}>
@@ -105,12 +104,9 @@ export function SensorCard({ value }: { value: LiveValue }) {
 
       <View style={styles.valueRow}>
         <Text style={styles.value}>{rounded}</Text>
-        <Text style={[styles.unit, { color: barColor }]}>
-          {meta?.unitOverride ?? value.unit}
-        </Text>
+        <Text style={[styles.unit, { color: barColor }]}>{value.unit}</Text>
       </View>
 
-      {/* Mini barra de progreso del sensor */}
       {meta ? (
         <View style={styles.progressBarBg}>
           <View
@@ -132,10 +128,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 12,
-    padding: 14,
-    minHeight: 100,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    minHeight: 104,
     justifyContent: "space-between",
+    overflow: "hidden",
+  },
+  accent: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
   },
   header: {
     flexDirection: "row",
@@ -143,20 +148,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   icon: {
-    fontSize: 14,
+    fontSize: 13,
   },
   name: {
     color: Colors.muted,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
     flexShrink: 1,
   },
   valueRow: {
     flexDirection: "row",
     alignItems: "baseline",
     gap: 6,
-    marginVertical: 4,
+    marginVertical: 6,
   },
   value: {
     color: Colors.text,
@@ -166,14 +171,13 @@ const styles = StyleSheet.create({
   },
   unit: {
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   progressBarBg: {
     height: 4,
     backgroundColor: Colors.surfaceAlt,
     borderRadius: 2,
     overflow: "hidden",
-    marginTop: 4,
   },
   progressBarFill: {
     height: "100%",
