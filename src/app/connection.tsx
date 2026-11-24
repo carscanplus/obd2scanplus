@@ -154,7 +154,10 @@ export default function ConnectionScreen() {
         <View style={styles.statusBox}>
           <Text style={styles.statusText}>{connectionMessage}</Text>
           {connected && (
-            <Pressable style={styles.disconnectButton} onPress={disconnect}>
+            <Pressable
+              style={styles.disconnectButton}
+              onPress={() => void disconnect()}
+            >
               <Text style={styles.disconnectText}>DESCONECTAR</Text>
             </Pressable>
           )}

@@ -48,7 +48,7 @@ describe("ObdSession (demo mode)", () => {
     expect(entry).toBeDefined();
 
     const session = new ObdSession();
-    session.connectDemo([entry!]);
+    await session.connectDemo([entry!]);
 
     const response = await session.query(Command.newPid("010C"));
     expect(response.payloadSize).toBe(4);
@@ -68,7 +68,7 @@ describe("ObdSession (demo mode)", () => {
       (r) => r.request === entry!.request && r.response.includes("NO DATA"),
     );
     const session = new ObdSession();
-    session.connectDemo(noData);
+    await session.connectDemo(noData);
 
     const response = await session.query(Command.newPid(entry!.request));
     expect(response.payloadSize).toBe(0);
@@ -76,7 +76,7 @@ describe("ObdSession (demo mode)", () => {
 
   it("no lanza errores al leer códigos en demo (sin datos modo 03)", async () => {
     const session = new ObdSession();
-    session.connectDemo(requests);
+    await session.connectDemo(requests);
     const codes = await session.getTroubleCodes();
     expect(codes).toEqual([]);
   });
@@ -180,6 +180,34 @@ describe("ObdSession (transporte real simulado)", () => {
     const session = new ObdSession();
     await expect(session.connect(transport, 0)).rejects.toThrow();
     expect(session.connected).toBe(false);
+  });
+
+  it("espera el cierre del transporte anterior antes de reconectar", async () => {
+    const previous = new MockTransport([
+      "ATI\r\rELM327 v2.2\r\r",
+      "ATDP\r\rAUTO\r\r",
+    ]);
+    const next = new MockTransport([
+      "ATI\r\rELM327 v2.2\r\r",
+      "ATDP\r\rAUTO\r\r",
+    ]);
+    const session = new ObdSession();
+    await session.connect(previous, 0);
+
+    let releaseDisconnect: (() => void) | undefined;
+    previous.disconnect = async () => {
+      await new Promise<void>((resolve) => {
+        releaseDisconnect = resolve;
+      });
+    };
+
+    const reconnecting = session.connect(next, 0);
+    await Promise.resolve();
+    expect(next.writes).toEqual([]);
+
+    releaseDisconnect?.();
+    await reconnecting;
+    expect(next.writes).toEqual(["ATI\r", "ATDP\r"]);
   });
 });
 

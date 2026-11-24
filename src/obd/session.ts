@@ -65,6 +65,12 @@ export class ObdSession {
   private freezeFrameQuery = false;
   /** Cola que serializa los comandos enviados al adaptador. */
   private queue: Promise<unknown> = Promise.resolve();
+  /**
+   * Cierre en curso del transporte. Mantenerlo permite que una nueva conexión
+   * espere el cierre GATT/RFCOMM anterior, incluso si el llamador pulsó
+   * desconectar y conectar sin esperar la primera promesa.
+   */
+  private disconnecting: Promise<void> = Promise.resolve();
 
   unitPreferences: UnitPreferences = { ...DEFAULT_UNIT_PREFERENCES };
   readTimeoutMs = DEFAULT_READ_TIMEOUT_MS;
@@ -102,7 +108,7 @@ export class ObdSession {
    * la configuración del adaptador.
    */
   async connect(transport: OBDTransport, protocol = 0): Promise<void> {
-    this.disconnect();
+    await this.disconnect();
     this.transport = transport;
     this.supportedPids = null;
     this.protocolName = null;
@@ -128,33 +134,40 @@ export class ObdSession {
     } catch (error) {
       // No dejes un socket RFCOMM/BLE abierto si el adaptador se desconecta o
       // no responde durante la secuencia de inicialización.
-      await transport.disconnect();
-      this.transport = null;
-      this.elmVersion = null;
-      this._connected = false;
-      this.queue = Promise.resolve();
+      await this.disconnect();
       throw error;
     }
   }
 
   /** Activa el modo demo reproduciendo respuestas grabadas. */
-  connectDemo(requests: RecordedRequest[]): void {
-    this.disconnect();
+  async connectDemo(requests: RecordedRequest[]): Promise<void> {
+    await this.disconnect();
     this.replayData = [...requests];
     this._connected = true;
   }
 
-  disconnect(): void {
+  async disconnect(): Promise<void> {
+    const transport = this.transport;
+    this.transport = null;
     this.queue = Promise.resolve();
-    if (this.transport) {
-      void this.transport.disconnect();
-      this.transport = null;
-    }
     this.replayData = null;
     this._connected = false;
     this.elmVersion = null;
     this.protocolName = null;
     this.supportedPids = null;
+
+    // Un segundo cierre espera al primero. Esto elimina la carrera entre el
+    // cierre asíncrono nativo y el siguiente connectToDevice/canal RFCOMM.
+    this.disconnecting = this.disconnecting.then(async () => {
+      if (!transport) return;
+      try {
+        await transport.disconnect();
+      } catch {
+        // La aplicación debe poder volver a intentar una conexión aunque el
+        // sistema ya haya liberado el enlace antes de cancelar explícitamente.
+      }
+    });
+    await this.disconnecting;
   }
 
   /** Comprueba comunicación con `ATI`; el primer intento puede perderse. */

@@ -2,7 +2,7 @@
   "expo": {
     "name": "obd2scanner",
     "slug": "obd2scanner",
-    "version": "1.0.3",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "obd2scanner",
@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.obd2scanner.app",
+      "buildNumber": "1000006",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Se usa para conectarse al adaptador OBD2 Bluetooth (ELM327) y leer los datos del vehículo.",
         "NSBluetoothPeripheralUsageDescription": "Se usa para conectarse al adaptador OBD2 Bluetooth (ELM327) y leer los datos del vehículo."
@@ -17,6 +18,7 @@
     },
     "android": {
       "package": "com.obd2scanner.app",
+      "versionCode": 1000006,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

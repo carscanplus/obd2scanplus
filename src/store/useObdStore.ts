@@ -39,7 +39,7 @@ interface ObdState {
   connectBle: (id: string, name: string) => Promise<void>;
   startDemoMode: () => void;
   stopDemoMode: () => void;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
   scanDtcs: () => Promise<void>;
   clearDtcs: () => Promise<void>;
   setPaused: (paused: boolean) => void;
@@ -152,7 +152,7 @@ export const useObdStore = create<ObdState>((set, get) => {
         // Si hay varios fallos seguidos y el adaptador ya no responde
         if (consecutiveErrors >= 4) {
           stopPolling();
-          state.session.disconnect();
+          void state.session.disconnect();
           set({
             status: "error",
             connectionMessage: "Se perdió la conexión con el adaptador OBD2.",
@@ -176,7 +176,7 @@ export const useObdStore = create<ObdState>((set, get) => {
     isDemoMode: false,
 
     startDemoMode: () => {
-      get().disconnect();
+      void get().disconnect();
       set({
         status: "connected",
         isDemoMode: true,
@@ -234,9 +234,8 @@ export const useObdStore = create<ObdState>((set, get) => {
     },
 
     connectSpp: async (address, name) => {
-      // 1. Limpieza rigurosa de cualquier sesión previa
-      get().disconnect();
-      await new Promise((r) => setTimeout(r, 250));
+      // Espera el cierre real del socket RFCOMM anterior antes de abrir otro.
+      await get().disconnect();
 
       const session = new ObdSession();
       session.onDisconnected = () => {
@@ -256,15 +255,16 @@ export const useObdStore = create<ObdState>((set, get) => {
         await session.connect(new SppTransport(address, name), 0);
         startSession(session, name);
       } catch (error) {
-        session.disconnect();
-        set({ status: "error", connectionMessage: errorMessage(error) });
+        await session.disconnect();
+        if (get().session === session) {
+          set({ status: "error", connectionMessage: errorMessage(error) });
+        }
       }
     },
 
     connectBle: async (id, name) => {
-      // 1. Limpieza rigurosa de cualquier sesión previa
-      get().disconnect();
-      await new Promise((r) => setTimeout(r, 250));
+      // Espera el cierre real del GATT anterior antes de abrir otro.
+      await get().disconnect();
 
       const session = new ObdSession();
       session.onDisconnected = () => {
@@ -284,15 +284,17 @@ export const useObdStore = create<ObdState>((set, get) => {
         await session.connect(new BleTransport(id, name), 0);
         startSession(session, name);
       } catch (error) {
-        session.disconnect();
-        set({ status: "error", connectionMessage: errorMessage(error) });
+        await session.disconnect();
+        if (get().session === session) {
+          set({ status: "error", connectionMessage: errorMessage(error) });
+        }
       }
     },
 
-    disconnect: () => {
+    disconnect: async () => {
       stopPolling();
       stopDemo();
-      get().session.disconnect();
+      const session = get().session;
       set({
         status: "disconnected",
         isDemoMode: false,
@@ -302,6 +304,7 @@ export const useObdStore = create<ObdState>((set, get) => {
         dtcs: [],
         paused: false,
       });
+      await session.disconnect();
     },
 
     scanDtcs: async () => {
