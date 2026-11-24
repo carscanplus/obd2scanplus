@@ -2,12 +2,20 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const tag = process.argv[2] ?? process.env.RELEASE_TAG;
-const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag ?? "");
+const tag = (process.argv[2] ?? process.env.RELEASE_TAG ?? "").trim();
+
+if (!tag) {
+  console.log(
+    "Sin tag de release: no se sincroniza la versión (ejecución manual sin versión).",
+  );
+  process.exit(0);
+}
+
+const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag);
 
 if (!match) {
   throw new Error(
-    `El tag de release debe tener el formato vX.Y.Z. Valor recibido: ${tag ?? "(vacío)"}`,
+    `El tag de release debe tener el formato vX.Y.Z. Valor recibido: ${tag}`,
   );
 }
 

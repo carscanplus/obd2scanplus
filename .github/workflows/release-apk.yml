@@ -36,10 +36,22 @@ jobs:
           cache: 'npm'
 
       - name: Sincronizar la versión con el tag de release
-        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag_name != ''
         env:
-          RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
-        run: node scripts/sync-release-version.mjs "$RELEASE_TAG"
+          RELEASE_TAG: ${{ inputs.tag_name }}
+        run: |
+          TAG="$RELEASE_TAG"
+          if [ -z "$TAG" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="$GITHUB_REF_NAME"
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "Ejecución manual sin tag de versión: no se sincroniza la versión."
+          elif [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            node scripts/sync-release-version.mjs "$TAG"
+          else
+            echo "::error::El tag '$TAG' no tiene el formato vX.Y.Z."
+            exit 1
+          fi
 
       - name: 📥 Instalar dependencias
         run: npm ci
