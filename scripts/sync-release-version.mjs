@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -47,17 +47,23 @@ const packageJson = readJson(packagePath);
 packageJson.version = version;
 writeJson(packagePath, packageJson);
 
-const gradle = readFileSync(gradlePath, "utf8")
-  .replace(/versionCode\s+\d+/, `versionCode ${versionCode}`)
-  .replace(/versionName\s+"[^"]+"/, `versionName "${version}"`);
+if (existsSync(gradlePath)) {
+  const gradle = readFileSync(gradlePath, "utf8")
+    .replace(/versionCode\s+\d+/, `versionCode ${versionCode}`)
+    .replace(/versionName\s+"[^"]+"/, `versionName "${version}"`);
 
-if (
-  !gradle.includes(`versionCode ${versionCode}`) ||
-  !gradle.includes(`versionName "${version}"`)
-) {
-  throw new Error(
-    "No se pudo sincronizar versionCode/versionName en android/app/build.gradle.",
+  if (
+    !gradle.includes(`versionCode ${versionCode}`) ||
+    !gradle.includes(`versionName "${version}"`)
+  ) {
+    throw new Error(
+      "No se pudo sincronizar versionCode/versionName en android/app/build.gradle.",
+    );
+  }
+
+  writeFileSync(gradlePath, gradle);
+} else {
+  console.log(
+    "android/app/build.gradle no existe (lo genera expo prebuild desde app.json); se omite.",
   );
 }
-
-writeFileSync(gradlePath, gradle);
